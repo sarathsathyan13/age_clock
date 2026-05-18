@@ -69,22 +69,9 @@ body {
   transition: box-shadow 0.3s ease;
 }
 
-.stopwatch.pulse {
-  animation: pulse-animation 0.12s ease-out;
-}
-
-@keyframes pulse-animation {
-  0% {
-    transform: scale(1);
-    box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.5), 0 0 30px rgba(0, 0, 0, 0.8);
-  }
-  50% {
-    transform: scale(1.015);
-    box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.5), 0 0 40px var(--accent);
-  }
-  100% {
-    transform: scale(1);
-    box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.5), 0 0 30px rgba(0, 0, 0, 0.8);
+@media (prefers-reduced-motion: reduce) {
+  .stopwatch {
+    transition: none;
   }
 }
 
@@ -223,12 +210,6 @@ button:active {
   display: block;
 }
 
-.pulse-group {
-  border-left: 2px solid var(--border);
-  padding-left: 12px;
-  margin-left: -6px;
-}
-
 @media (max-width: 480px) {
   body {
     padding: 8px;
@@ -257,19 +238,6 @@ select:focus,
 input:focus {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .stopwatch,
-  button {
-    transition: none;
-  }
-
-  @keyframes pulse-animation {
-    0%, 100% {
-      transform: scale(1);
-    }
-  }
 }
 </style>
 </head>
@@ -320,21 +288,9 @@ input:focus {
         <option value="theme-classic">Classic</option>
       </select>
     </label>
-    <label for="beat">
-      <span>Pulse ❤️</span>
-      <input type="checkbox" id="beat" checked aria-label="Enable pulse animation">
-    </label>
-    <label for="doubleBeat" class="pulse-group">
-      <span>Double</span>
-      <input type="checkbox" id="doubleBeat" aria-label="Enable double pulse">
-    </label>
     <label for="exact">
       <span>Exact Calendar</span>
       <input type="checkbox" id="exact" checked aria-label="Use exact calendar calculation">
-    </label>
-    <label for="awake">
-      <span>Screen Awake</span>
-      <input type="checkbox" id="awake" aria-label="Keep screen on">
     </label>
   </div>
 
@@ -353,16 +309,11 @@ const CONFIG = {
   AVG_HEARTBEAT_BPM: 72,
   AVG_MONTHS_PER_YEAR: 12,
   AVG_DAYS_PER_YEAR: 365.2422,
-  AVG_DAYS_PER_MONTH: 30.44,
-  PULSE_DURATION: 120,
-  DOUBLE_BEAT_DELAY: 200
+  AVG_DAYS_PER_MONTH: 30.44
 };
 
 let birth = null;
 let animationFrameId = null;
-let lastSec = -1;
-let wakeLock = null;
-let pulseTimeouts = [];
 
 const elements = {
   watch: document.getElementById('watch'),
@@ -377,10 +328,7 @@ const elements = {
   heartbeats: document.getElementById('heartbeats'),
   birthday: document.getElementById('birthday'),
   theme: document.getElementById('theme'),
-  beat: document.getElementById('beat'),
-  doubleBeat: document.getElementById('doubleBeat'),
   exact: document.getElementById('exact'),
-  awake: document.getElementById('awake'),
   editBirth: document.getElementById('editBirth'),
   analog: document.getElementById('analog'),
   errorMessage: document.getElementById('errorMessage')
@@ -388,6 +336,9 @@ const elements = {
 
 const canvasContext = elements.analog.getContext('2d');
 
+/**
+ * Initialize birth date from localStorage or use default
+ */
 function initializeBirthDate() {
   try {
     const stored = localStorage.getItem('birth');
@@ -404,10 +355,16 @@ function initializeBirthDate() {
   birth = new Date(CONFIG.DEFAULT_BIRTH);
 }
 
+/**
+ * Validate if a date object is valid
+ */
 function isValidDate(date) {
   return date instanceof Date && !isNaN(date.getTime());
 }
 
+/**
+ * Get CSS custom property value from root element
+ */
 function getThemeColor(varName) {
   try {
     const value = getComputedStyle(document.documentElement)
@@ -419,20 +376,29 @@ function getThemeColor(varName) {
   }
 }
 
+/**
+ * Draw analog clock showing seconds
+ */
 function drawAnalog(seconds) {
   const size = 180;
+  const radius = 80;
+  const centerX = size / 2;
+  const centerY = size / 2;
+
   canvasContext.clearRect(0, 0, size, size);
   canvasContext.save();
-  canvasContext.translate(size / 2, size / 2);
-  
+  canvasContext.translate(centerX, centerY);
+
+  // Draw circle outline
   canvasContext.beginPath();
-  canvasContext.arc(0, 0, 80, 0, Math.PI * 2);
+  canvasContext.arc(0, 0, radius, 0, Math.PI * 2);
   canvasContext.strokeStyle = getComputedStyle(document.documentElement)
     .getPropertyValue('--dark-muted')
     .trim() || '#6b7280';
   canvasContext.lineWidth = 1;
   canvasContext.stroke();
-  
+
+  // Draw second hand
   canvasContext.rotate((seconds / 60) * Math.PI * 2);
   canvasContext.beginPath();
   canvasContext.moveTo(0, 0);
@@ -440,107 +406,95 @@ function drawAnalog(seconds) {
   canvasContext.strokeStyle = getThemeColor('--accent');
   canvasContext.lineWidth = 2;
   canvasContext.stroke();
-  
+
   canvasContext.restore();
 }
 
+/**
+ * Calculate exact age in years, months, and days
+ */
 function exactDiff(birthDate, currentDate) {
-  let y = currentDate.getFullYear() - birthDate.getFullYear();
-  let m = currentDate.getMonth() - birthDate.getMonth();
-  let d = currentDate.getDate() - birthDate.getDate();
-  
-  if (d < 0) {
-    m--;
-    d += new Date(currentDate.getFullYear(), currentDate.getMonth(), 0).getDate();
+  let years = currentDate.getFullYear() - birthDate.getFullYear();
+  let months = currentDate.getMonth() - birthDate.getMonth();
+  let days = currentDate.getDate() - birthDate.getDate();
+
+  if (days < 0) {
+    months--;
+    days += new Date(currentDate.getFullYear(), currentDate.getMonth(), 0).getDate();
   }
-  
-  if (m < 0) {
-    y--;
-    m += CONFIG.AVG_MONTHS_PER_YEAR;
+
+  if (months < 0) {
+    years--;
+    months += CONFIG.AVG_MONTHS_PER_YEAR;
   }
-  
-  return { y, m, d };
+
+  return { years, months, days };
 }
 
+/**
+ * Format a number as a zero-padded string
+ */
 function formatTime(value, digits = 2) {
   return String(value).padStart(digits, '0');
 }
 
-function clearPulseTimeouts() {
-  pulseTimeouts.forEach(timeout => clearTimeout(timeout));
-  pulseTimeouts = [];
-}
-
-function triggerPulse() {
-  clearPulseTimeouts();
-  
-  elements.watch.classList.remove('pulse');
-  void elements.watch.offsetWidth;
-  elements.watch.classList.add('pulse');
-  
-  pulseTimeouts.push(
-    setTimeout(() => elements.watch.classList.remove('pulse'), CONFIG.PULSE_DURATION)
-  );
-  
-  if (elements.doubleBeat.checked) {
-    pulseTimeouts.push(
-      setTimeout(() => {
-        elements.watch.classList.add('pulse');
-        pulseTimeouts.push(
-          setTimeout(() => elements.watch.classList.remove('pulse'), CONFIG.PULSE_DURATION)
-        );
-      }, CONFIG.DOUBLE_BEAT_DELAY)
-    );
-  }
-}
-
+/**
+ * Update all display elements with current life statistics
+ */
 function updateDisplay() {
   const now = new Date();
   const totalMs = now - birth;
-  
+
   if (totalMs < 0) {
     showError('Birth date cannot be in the future');
     return;
   }
-  
+
   const totalSec = Math.floor(totalMs / 1000);
   const totalMin = Math.floor(totalSec / 60);
   const totalHours = Math.floor(totalMin / 60);
   const totalDays = Math.floor(totalHours / 24);
-  
+
+  // Calculate years, months, days
   let years, months, days;
   if (elements.exact.checked) {
-    ({ y: years, m: months, d: days } = exactDiff(birth, now));
+    ({ years, months, days } = exactDiff(birth, now));
   } else {
     years = Math.floor(totalDays / CONFIG.AVG_DAYS_PER_YEAR);
     const remainder = totalDays - years * CONFIG.AVG_DAYS_PER_YEAR;
     months = Math.floor(remainder / CONFIG.AVG_DAYS_PER_MONTH);
     days = Math.floor(remainder - months * CONFIG.AVG_DAYS_PER_MONTH);
   }
-  
+
+  // Calculate remaining time units
   const hours = Math.floor((totalSec % 86400) / 3600);
   const minutes = Math.floor((totalSec % 3600) / 60);
   const seconds = totalSec % 60;
   const milliseconds = totalMs % 1000;
-  
+
+  // Update main time display
   elements.mainTime.textContent =
     `${formatTime(years)}:${formatTime(months)}:${formatTime(days)}:` +
     `${formatTime(hours)}:${formatTime(minutes)}:${formatTime(seconds)}.` +
     `${formatTime(milliseconds, 3)}`;
-  
+
+  // Update statistics
   elements.tMonths.textContent = Math.floor(totalDays / CONFIG.AVG_DAYS_PER_MONTH).toLocaleString();
   elements.tWeeks.textContent = Math.floor(totalDays / 7).toLocaleString();
   elements.tDays.textContent = totalDays.toLocaleString();
   elements.tHours.textContent = totalHours.toLocaleString();
   elements.tMinutes.textContent = totalMin.toLocaleString();
   elements.tSeconds.textContent = totalSec.toLocaleString();
-  
+
+  // Calculate life percentage
   const lifeUsedPercent = (totalDays / (CONFIG.LIFE_EXPECTANCY_YEARS * CONFIG.AVG_DAYS_PER_YEAR)) * 100;
   elements.lifePct.textContent = lifeUsedPercent.toFixed(4) + '%';
-  
+
+  // Calculate heartbeats
   const heartbeatsLived = Math.floor(totalMin * CONFIG.AVG_HEARTBEAT_BPM);
   elements.heartbeats.textContent = heartbeatsLived.toLocaleString();
-  
+
+  // Calculate days until next birthday
   let nextBirthday = new Date(birth);
   nextBirthday.setFullYear(now.getFullYear());
   if (nextBirthday < now) {
@@ -548,26 +502,31 @@ function updateDisplay() {
   }
   const daysUntilBirthday = Math.ceil((nextBirthday - now) / 86400000);
   elements.birthday.textContent = `🎂 Next birthday in ${daysUntilBirthday} day${daysUntilBirthday !== 1 ? 's' : ''}`;
-  
+
+  // Update analog clock
   drawAnalog(seconds);
-  
-  if (elements.beat.checked && seconds !== lastSec) {
-    triggerPulse();
-    lastSec = seconds;
-  }
 }
 
+/**
+ * Animation loop for continuous updates
+ */
 function animationLoop() {
   updateDisplay();
   animationFrameId = requestAnimationFrame(animationLoop);
 }
 
+/**
+ * Start the animation loop
+ */
 function startAnimation() {
   if (animationFrameId === null) {
     animationLoop();
   }
 }
 
+/**
+ * Stop the animation loop
+ */
 function stopAnimation() {
   if (animationFrameId !== null) {
     cancelAnimationFrame(animationFrameId);
@@ -575,78 +534,9 @@ function stopAnimation() {
   }
 }
 
-elements.theme.addEventListener('change', () => {
-  document.body.className = elements.theme.value;
-  drawAnalog(lastSec);
-});
-
-elements.awake.addEventListener('change', async () => {
-  try {
-    if (elements.awake.checked) {
-      if ('wakeLock' in navigator) {
-        wakeLock = await navigator.wakeLock.request('screen');
-      }
-    } else {
-      if (wakeLock) {
-        await wakeLock.release();
-        wakeLock = null;
-      }
-    }
-  } catch (error) {
-    console.warn('Wake Lock API not supported:', error);
-    elements.awake.checked = false;
-    showError('Wake Lock not supported');
-  }
-});
-
-elements.editBirth.addEventListener('click', () => {
-  const dateStr = prompt(
-    'Enter birth date (YYYY-MM-DD HH:MM):\n\nCurrent: ' +
-    birth.toISOString().slice(0, 16).replace('T', ' ')
-  );
-  
-  if (!dateStr) return;
-  
-  const parsed = new Date(dateStr);
-  if (!isValidDate(parsed)) {
-    showError('Invalid format: use YYYY-MM-DD HH:MM');
-    return;
-  }
-  
-  if (parsed > new Date()) {
-    showError('Birth date cannot be in the future');
-    return;
-  }
-  
-  try {
-    localStorage.setItem('birth', parsed.toISOString());
-    birth = parsed;
-    lastSec = -1;
-    showError('');
-    updateDisplay();
-  } catch (error) {
-    showError('Failed to save: ' + error.message);
-  }
-});
-
-document.addEventListener('visibilitychange', () => {
-  if (document.hidden) {
-    stopAnimation();
-  } else {
-    startAnimation();
-  }
-});
-
-document.addEventListener('visibilitychange', async () => {
-  if (!document.hidden && elements.awake.checked && !wakeLock) {
-    try {
-      wakeLock = await navigator.wakeLock.request('screen');
-    } catch (error) {
-      console.warn('Failed to reacquire wake lock:', error);
-    }
-  }
-});
-
+/**
+ * Display error message
+ */
 function showError(message) {
   if (message) {
     elements.errorMessage.textContent = message;
@@ -656,12 +546,67 @@ function showError(message) {
   }
 }
 
+/**
+ * Handle theme change
+ */
+elements.theme.addEventListener('change', () => {
+  document.body.className = elements.theme.value;
+  updateDisplay();
+});
+
+/**
+ * Handle edit birth date button
+ */
+elements.editBirth.addEventListener('click', () => {
+  const dateStr = prompt(
+    'Enter birth date (YYYY-MM-DD HH:MM):\n\nCurrent: ' +
+    birth.toISOString().slice(0, 16).replace('T', ' ')
+  );
+
+  if (!dateStr) return;
+
+  const parsed = new Date(dateStr);
+  if (!isValidDate(parsed)) {
+    showError('Invalid format: use YYYY-MM-DD HH:MM');
+    return;
+  }
+
+  if (parsed > new Date()) {
+    showError('Birth date cannot be in the future');
+    return;
+  }
+
+  try {
+    localStorage.setItem('birth', parsed.toISOString());
+    birth = parsed;
+    showError('');
+    updateDisplay();
+  } catch (error) {
+    showError('Failed to save: ' + error.message);
+  }
+});
+
+/**
+ * Handle visibility change (tab focus)
+ */
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) {
+    stopAnimation();
+  } else {
+    startAnimation();
+  }
+});
+
+/**
+ * Register service worker for PWA support
+ */
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('service-worker.js').catch(error => {
     console.warn('Service Worker registration failed:', error);
   });
 }
 
+// Initialize and start
 initializeBirthDate();
 startAnimation();
 </script>

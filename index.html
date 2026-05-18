@@ -81,6 +81,12 @@ body {
   letter-spacing: 2px;
   color: var(--muted);
   margin: 0 0 12px 0;
+  cursor: pointer;
+  transition: color 0.2s ease;
+}
+
+.title:hover {
+  color: var(--accent);
 }
 
 .analog-container {
@@ -112,7 +118,7 @@ canvas {
   letter-spacing: 0.5px;
 }
 
-.life-percentage {
+.next-birthday {
   text-align: center;
   font-size: 12px;
   margin-top: 6px;
@@ -244,7 +250,7 @@ input:focus {
 
 <body>
 <div class="stopwatch" id="watch">
-  <div class="title" role="heading" aria-level="1">SARATH P S -Life Clock</div>
+  <div class="title" id="title" role="heading" aria-level="1" title="Click to edit name">SARATH P S -Life Clock</div>
 
   <div class="analog-container">
     <canvas 
@@ -261,9 +267,7 @@ input:focus {
   <div class="main-time" id="mainTime" role="status" aria-live="off">00:00:00:00:00:00.000</div>
   <div class="labels">Y : M : D : H : M : S . ms</div>
 
-  <div class="life-percentage">
-    Life Used: <span id="lifePct" aria-label="percentage of life lived">0%</span>
-  </div>
+  <div class="next-birthday" id="nextBirthdayTop" aria-live="polite"></div>
 
   <div class="divider" role="separator"></div>
 
@@ -305,6 +309,7 @@ input:focus {
 
 const CONFIG = {
   DEFAULT_BIRTH: '2000-11-13T07:09:00',
+  DEFAULT_NAME: 'SARATH P S -Life Clock',
   LIFE_EXPECTANCY_YEARS: 80,
   AVG_HEARTBEAT_BPM: 72,
   AVG_MONTHS_PER_YEAR: 12,
@@ -313,12 +318,14 @@ const CONFIG = {
 };
 
 let birth = null;
+let name = CONFIG.DEFAULT_NAME;
 let animationFrameId = null;
 
 const elements = {
   watch: document.getElementById('watch'),
+  title: document.getElementById('title'),
   mainTime: document.getElementById('mainTime'),
-  lifePct: document.getElementById('lifePct'),
+  nextBirthdayTop: document.getElementById('nextBirthdayTop'),
   tMonths: document.getElementById('tMonths'),
   tWeeks: document.getElementById('tWeeks'),
   tDays: document.getElementById('tDays'),
@@ -353,6 +360,23 @@ function initializeBirthDate() {
     console.warn('Error reading birth date from storage:', error);
   }
   birth = new Date(CONFIG.DEFAULT_BIRTH);
+}
+
+/**
+ * Initialize name from localStorage or use default
+ */
+function initializeName() {
+  try {
+    const stored = localStorage.getItem('name');
+    if (stored) {
+      name = stored;
+      elements.title.textContent = name;
+      return;
+    }
+  } catch (error) {
+    console.warn('Error reading name from storage:', error);
+  }
+  name = CONFIG.DEFAULT_NAME;
 }
 
 /**
@@ -486,10 +510,6 @@ function updateDisplay() {
   elements.tMinutes.textContent = totalMin.toLocaleString();
   elements.tSeconds.textContent = totalSec.toLocaleString();
 
-  // Calculate life percentage
-  const lifeUsedPercent = (totalDays / (CONFIG.LIFE_EXPECTANCY_YEARS * CONFIG.AVG_DAYS_PER_YEAR)) * 100;
-  elements.lifePct.textContent = lifeUsedPercent.toFixed(4) + '%';
-
   // Calculate heartbeats
   const heartbeatsLived = Math.floor(totalMin * CONFIG.AVG_HEARTBEAT_BPM);
   elements.heartbeats.textContent = heartbeatsLived.toLocaleString();
@@ -501,7 +521,9 @@ function updateDisplay() {
     nextBirthday.setFullYear(now.getFullYear() + 1);
   }
   const daysUntilBirthday = Math.ceil((nextBirthday - now) / 86400000);
-  elements.birthday.textContent = `🎂 Next birthday in ${daysUntilBirthday} day${daysUntilBirthday !== 1 ? 's' : ''}`;
+  const birthdayText = `🎂 Next birthday in ${daysUntilBirthday} day${daysUntilBirthday !== 1 ? 's' : ''}`;
+  elements.nextBirthdayTop.textContent = birthdayText;
+  elements.birthday.textContent = birthdayText;
 
   // Update analog clock
   drawAnalog(seconds);
@@ -545,6 +567,31 @@ function showError(message) {
     elements.errorMessage.classList.remove('show');
   }
 }
+
+/**
+ * Handle name change
+ */
+elements.title.addEventListener('click', () => {
+  const newName = prompt('Enter name for the Life Clock:', name);
+  
+  if (newName === null) return;
+  
+  const trimmedName = newName.trim();
+  if (!trimmedName) {
+    showError('Name cannot be empty');
+    return;
+  }
+
+  try {
+    localStorage.setItem('name', trimmedName);
+    name = trimmedName;
+    elements.title.textContent = name;
+    showError('');
+    updateDisplay();
+  } catch (error) {
+    showError('Failed to save name: ' + error.message);
+  }
+});
 
 /**
  * Handle theme change
@@ -608,6 +655,7 @@ if ('serviceWorker' in navigator) {
 
 // Initialize and start
 initializeBirthDate();
+initializeName();
 startAnimation();
 </script>
 </body>

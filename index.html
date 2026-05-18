@@ -83,10 +83,26 @@ body {
   margin: 0 0 12px 0;
   cursor: pointer;
   transition: color 0.2s ease;
+  user-select: none;
+  position: relative;
+  display: inline-block;
+  width: 100%;
 }
 
 .title:hover {
   color: var(--accent);
+}
+
+.title::after {
+  content: ' ✎';
+  font-size: 12px;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  margin-left: 4px;
+}
+
+.title:hover::after {
+  opacity: 0.7;
 }
 
 .analog-container {
@@ -300,8 +316,6 @@ input:focus {
 
   <button id="editBirth">🔐 Edit Birth Date</button>
   <div class="error-message" id="errorMessage" role="alert"></div>
-
-  <div class="footer" id="birthday" aria-live="polite"></div>
 </div>
 
 <script>
@@ -333,7 +347,6 @@ const elements = {
   tMinutes: document.getElementById('tMinutes'),
   tSeconds: document.getElementById('tSeconds'),
   heartbeats: document.getElementById('heartbeats'),
-  birthday: document.getElementById('birthday'),
   theme: document.getElementById('theme'),
   exact: document.getElementById('exact'),
   editBirth: document.getElementById('editBirth'),
@@ -523,7 +536,6 @@ function updateDisplay() {
   const daysUntilBirthday = Math.ceil((nextBirthday - now) / 86400000);
   const birthdayText = `🎂 Next birthday in ${daysUntilBirthday} day${daysUntilBirthday !== 1 ? 's' : ''}`;
   elements.nextBirthdayTop.textContent = birthdayText;
-  elements.birthday.textContent = birthdayText;
 
   // Update analog clock
   drawAnalog(seconds);

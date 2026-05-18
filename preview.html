@@ -1,0 +1,735 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Life Stopwatch Pro</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="Track your life in real-time with Life Stopwatch Pro">
+
+<!-- PWA -->
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#020617">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+
+<style>
+:root {
+  --bg: #020617;
+  --fg: #e5e7eb;
+  --accent: #ef4444;
+  --border: #1f2937;
+  --muted: #9ca3af;
+  --dark-muted: #6b7280;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  width: 100%;
+}
+
+body {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  background: radial-gradient(circle, #111827, var(--bg));
+  font-family: 'Courier New', monospace;
+  color: var(--fg);
+  padding: 16px;
+}
+
+.theme-neon {
+  --fg: #22d3ee;
+  --accent: #22d3ee;
+}
+
+.theme-classic {
+  --bg: #f8fafc;
+  --fg: #020617;
+  --accent: #2563eb;
+  --border: #e2e8f0;
+  --muted: #64748b;
+  --dark-muted: #94a3b8;
+}
+
+.stopwatch {
+  width: 100%;
+  max-width: 380px;
+  padding: 24px;
+  border-radius: 26px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.5), 0 0 30px rgba(0, 0, 0, 0.8);
+  transition: box-shadow 0.3s ease;
+}
+
+.stopwatch.pulse {
+  animation: pulse-animation 0.12s ease-out;
+}
+
+@keyframes pulse-animation {
+  0% {
+    transform: scale(1);
+    box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.5), 0 0 30px rgba(0, 0, 0, 0.8);
+  }
+  50% {
+    transform: scale(1.015);
+    box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.5), 0 0 40px var(--accent);
+  }
+  100% {
+    transform: scale(1);
+    box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.5), 0 0 30px rgba(0, 0, 0, 0.8);
+  }
+}
+
+.title {
+  text-align: center;
+  font-size: 14px;
+  letter-spacing: 2px;
+  color: var(--muted);
+  margin: 0 0 4px 0;
+  cursor: pointer;
+  transition: color 0.2s ease;
+}
+
+.title:hover {
+  color: var(--accent);
+}
+
+.name-display {
+  text-align: center;
+  font-size: 18px;
+  font-weight: bold;
+  color: var(--fg);
+  margin-bottom: 8px;
+  min-height: 24px;
+}
+
+.analog-container {
+  display: flex;
+  justify-content: center;
+  margin: 10px 0;
+}
+
+canvas {
+  display: block;
+  max-width: 100%;
+  height: auto;
+}
+
+.main-time {
+  text-align: center;
+  font-size: 22px;
+  font-weight: bold;
+  margin-top: 10px;
+  font-family: 'Courier New', monospace;
+  letter-spacing: 1px;
+}
+
+.labels {
+  text-align: center;
+  font-size: 10px;
+  color: var(--dark-muted);
+  margin-top: 4px;
+  letter-spacing: 0.5px;
+}
+
+.birthday-section {
+  text-align: center;
+  font-size: 14px;
+  margin-top: 8px;
+  color: var(--fg);
+  font-weight: bold;
+}
+
+.birthday-days {
+  font-size: 20px;
+  color: var(--accent);
+}
+
+.divider {
+  height: 1px;
+  background: var(--border);
+  margin: 14px 0;
+}
+
+.row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+  padding: 3px 0;
+  color: var(--fg);
+}
+
+.controls {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.controls label {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 13px;
+  padding: 4px 0;
+  cursor: pointer;
+}
+
+.controls input[type="checkbox"],
+.controls select {
+  cursor: pointer;
+  padding: 4px 6px;
+  background: var(--border);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+}
+
+.controls input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+}
+
+.controls select {
+  min-width: 100px;
+}
+
+.footer {
+  text-align: center;
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 8px;
+}
+
+button {
+  width: 100%;
+  padding: 10px 16px;
+  margin-top: 12px;
+  background: var(--accent);
+  color: var(--bg);
+  border: none;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: opacity 0.2s ease, transform 0.1s ease;
+  font-family: inherit;
+}
+
+button:hover {
+  opacity: 0.9;
+}
+
+button:active {
+  transform: scale(0.98);
+}
+
+.error-message {
+  color: #ef4444;
+  font-size: 12px;
+  margin-top: 8px;
+  text-align: center;
+  display: none;
+}
+
+.error-message.show {
+  display: block;
+}
+
+.pulse-group {
+  border-left: 2px solid var(--border);
+  padding-left: 12px;
+  margin-left: -6px;
+}
+
+@media (max-width: 480px) {
+  body {
+    padding: 8px;
+  }
+
+  .stopwatch {
+    padding: 16px;
+  }
+
+  .main-time {
+    font-size: 18px;
+  }
+
+  .row, .controls label {
+    font-size: 12px;
+  }
+
+  canvas {
+    width: 100%;
+    height: auto;
+  }
+}
+
+button:focus,
+select:focus,
+input:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stopwatch,
+  button {
+    transition: none;
+  }
+
+  @keyframes pulse-animation {
+    0%, 100% {
+      transform: scale(1);
+    }
+  }
+}
+</style>
+</head>
+
+<body>
+<div class="stopwatch" id="watch">
+  <div class="title" role="heading" aria-level="1" title="Click to edit name">LIFE STOPWATCH PRO</div>
+  <div class="name-display" id="nameDisplay"></div>
+
+  <div class="analog-container">
+    <canvas 
+      id="analog" 
+      width="180" 
+      height="180"
+      role="img"
+      aria-label="Analog clock showing seconds"
+      aria-live="polite">
+      Your browser doesn't support the HTML5 canvas element
+    </canvas>
+  </div>
+
+  <div class="main-time" id="mainTime" role="status" aria-live="off">00:00:00:00:00:00.000</div>
+  <div class="labels">Y : M : D : H : M : S . ms</div>
+
+  <div class="birthday-section">
+    🎂 Next Birthday in <span class="birthday-days" id="birthdayDays">—</span> day<span id="dayLabel">s</span>
+  </div>
+
+  <div class="divider" role="separator"></div>
+
+  <div class="details">
+    <div class="row"><span>Total Months</span><span id="tMonths" aria-label="total months lived">—</span></div>
+    <div class="row"><span>Total Weeks</span><span id="tWeeks" aria-label="total weeks lived">—</span></div>
+    <div class="row"><span>Total Days</span><span id="tDays" aria-label="total days lived">—</span></div>
+    <div class="row"><span>Total Hours</span><span id="tHours" aria-label="total hours lived">—</span></div>
+    <div class="row"><span>Total Minutes</span><span id="tMinutes" aria-label="total minutes lived">—</span></div>
+    <div class="row"><span>Total Seconds</span><span id="tSeconds" aria-label="total seconds lived">—</span></div>
+    <div class="row"><span>Heartbeats Lived ❤️</span><span id="heartbeats" aria-label="heartbeats lived">—</span></div>
+  </div>
+
+  <div class="divider" role="separator"></div>
+
+  <div class="controls">
+    <label for="theme">
+      <span>Theme</span>
+      <select id="theme" aria-label="Select color theme">
+        <option value="">Dark</option>
+        <option value="theme-neon">Neon</option>
+        <option value="theme-classic">Classic</option>
+      </select>
+    </label>
+    <label for="beat">
+      <span>Pulse ❤️</span>
+      <input type="checkbox" id="beat" checked aria-label="Enable pulse animation">
+    </label>
+    <label for="doubleBeat" class="pulse-group">
+      <span>Double</span>
+      <input type="checkbox" id="doubleBeat" aria-label="Enable double pulse">
+    </label>
+    <label for="exact">
+      <span>Exact Calendar</span>
+      <input type="checkbox" id="exact" checked aria-label="Use exact calendar calculation">
+    </label>
+    <label for="awake">
+      <span>Screen Awake</span>
+      <input type="checkbox" id="awake" aria-label="Keep screen on">
+    </label>
+  </div>
+
+  <button id="editName">✏️ Edit Name</button>
+  <button id="editBirth">🔐 Edit Birth Date</button>
+  <div class="error-message" id="errorMessage" role="alert"></div>
+
+  <div class="footer" id="footer"></div>
+</div>
+
+<script>
+'use strict';
+
+const CONFIG = {
+  DEFAULT_BIRTH: '2000-11-13T07:09:00',
+  DEFAULT_NAME: '',
+  LIFE_EXPECTANCY_YEARS: 80,
+  AVG_HEARTBEAT_BPM: 72,
+  AVG_MONTHS_PER_YEAR: 12,
+  AVG_DAYS_PER_YEAR: 365.2422,
+  AVG_DAYS_PER_MONTH: 30.44,
+  PULSE_DURATION: 120,
+  DOUBLE_BEAT_DELAY: 200
+};
+
+let birth = null;
+let personName = '';
+let animationFrameId = null;
+let lastSec = -1;
+let wakeLock = null;
+let pulseTimeouts = [];
+
+const elements = {
+  watch: document.getElementById('watch'),
+  nameDisplay: document.getElementById('nameDisplay'),
+  mainTime: document.getElementById('mainTime'),
+  tMonths: document.getElementById('tMonths'),
+  tWeeks: document.getElementById('tWeeks'),
+  tDays: document.getElementById('tDays'),
+  tHours: document.getElementById('tHours'),
+  tMinutes: document.getElementById('tMinutes'),
+  tSeconds: document.getElementById('tSeconds'),
+  heartbeats: document.getElementById('heartbeats'),
+  birthdayDays: document.getElementById('birthdayDays'),
+  dayLabel: document.getElementById('dayLabel'),
+  theme: document.getElementById('theme'),
+  beat: document.getElementById('beat'),
+  doubleBeat: document.getElementById('doubleBeat'),
+  exact: document.getElementById('exact'),
+  awake: document.getElementById('awake'),
+  editName: document.getElementById('editName'),
+  editBirth: document.getElementById('editBirth'),
+  analog: document.getElementById('analog'),
+  errorMessage: document.getElementById('errorMessage'),
+  footer: document.getElementById('footer')
+};
+
+const canvasContext = elements.analog.getContext('2d');
+
+function initializeData() {
+  try {
+    const stored = localStorage.getItem('birth');
+    if (stored) {
+      const date = new Date(stored);
+      if (isValidDate(date)) {
+        birth = date;
+      }
+    }
+  } catch (error) {
+    console.warn('Error reading birth date:', error);
+  }
+  
+  if (!birth) {
+    birth = new Date(CONFIG.DEFAULT_BIRTH);
+  }
+
+  try {
+    personName = localStorage.getItem('personName') || CONFIG.DEFAULT_NAME;
+  } catch (error) {
+    console.warn('Error reading name:', error);
+    personName = CONFIG.DEFAULT_NAME;
+  }
+
+  updateNameDisplay();
+}
+
+function isValidDate(date) {
+  return date instanceof Date && !isNaN(date.getTime());
+}
+
+function getThemeColor(varName) {
+  try {
+    const value = getComputedStyle(document.documentElement)
+      .getPropertyValue(varName)
+      .trim();
+    return value || '#ef4444';
+  } catch {
+    return '#ef4444';
+  }
+}
+
+function updateNameDisplay() {
+  elements.nameDisplay.textContent = personName || '';
+}
+
+function drawAnalog(seconds) {
+  const size = 180;
+  canvasContext.clearRect(0, 0, size, size);
+  canvasContext.save();
+  canvasContext.translate(size / 2, size / 2);
+  
+  canvasContext.beginPath();
+  canvasContext.arc(0, 0, 80, 0, Math.PI * 2);
+  canvasContext.strokeStyle = getComputedStyle(document.documentElement)
+    .getPropertyValue('--dark-muted')
+    .trim() || '#6b7280';
+  canvasContext.lineWidth = 1;
+  canvasContext.stroke();
+  
+  canvasContext.rotate((seconds / 60) * Math.PI * 2);
+  canvasContext.beginPath();
+  canvasContext.moveTo(0, 0);
+  canvasContext.lineTo(0, -60);
+  canvasContext.strokeStyle = getThemeColor('--accent');
+  canvasContext.lineWidth = 2;
+  canvasContext.stroke();
+  
+  canvasContext.restore();
+}
+
+function exactDiff(birthDate, currentDate) {
+  let y = currentDate.getFullYear() - birthDate.getFullYear();
+  let m = currentDate.getMonth() - birthDate.getMonth();
+  let d = currentDate.getDate() - birthDate.getDate();
+  
+  if (d < 0) {
+    m--;
+    d += new Date(currentDate.getFullYear(), currentDate.getMonth(), 0).getDate();
+  }
+  
+  if (m < 0) {
+    y--;
+    m += CONFIG.AVG_MONTHS_PER_YEAR;
+  }
+  
+  return { y, m, d };
+}
+
+function formatTime(value, digits = 2) {
+  return String(value).padStart(digits, '0');
+}
+
+function clearPulseTimeouts() {
+  pulseTimeouts.forEach(timeout => clearTimeout(timeout));
+  pulseTimeouts = [];
+}
+
+function triggerPulse() {
+  clearPulseTimeouts();
+  
+  elements.watch.classList.remove('pulse');
+  void elements.watch.offsetWidth;
+  elements.watch.classList.add('pulse');
+  
+  pulseTimeouts.push(
+    setTimeout(() => elements.watch.classList.remove('pulse'), CONFIG.PULSE_DURATION)
+  );
+  
+  if (elements.doubleBeat.checked) {
+    pulseTimeouts.push(
+      setTimeout(() => {
+        elements.watch.classList.add('pulse');
+        pulseTimeouts.push(
+          setTimeout(() => elements.watch.classList.remove('pulse'), CONFIG.PULSE_DURATION)
+        );
+      }, CONFIG.DOUBLE_BEAT_DELAY)
+    );
+  }
+}
+
+function updateDisplay() {
+  const now = new Date();
+  const totalMs = now - birth;
+  
+  if (totalMs < 0) {
+    showError('Birth date cannot be in the future');
+    return;
+  }
+  
+  const totalSec = Math.floor(totalMs / 1000);
+  const totalMin = Math.floor(totalSec / 60);
+  const totalHours = Math.floor(totalMin / 60);
+  const totalDays = Math.floor(totalHours / 24);
+  
+  let years, months, days;
+  if (elements.exact.checked) {
+    ({ y: years, m: months, d: days } = exactDiff(birth, now));
+  } else {
+    years = Math.floor(totalDays / CONFIG.AVG_DAYS_PER_YEAR);
+    const remainder = totalDays - years * CONFIG.AVG_DAYS_PER_YEAR;
+    months = Math.floor(remainder / CONFIG.AVG_DAYS_PER_MONTH);
+    days = Math.floor(remainder - months * CONFIG.AVG_DAYS_PER_MONTH);
+  }
+  
+  const hours = Math.floor((totalSec % 86400) / 3600);
+  const minutes = Math.floor((totalSec % 3600) / 60);
+  const seconds = totalSec % 60;
+  const milliseconds = totalMs % 1000;
+  
+  elements.mainTime.textContent =
+    `${formatTime(years)}:${formatTime(months)}:${formatTime(days)}:` +
+    `${formatTime(hours)}:${formatTime(minutes)}:${formatTime(seconds)}.` +
+    `${formatTime(milliseconds, 3)}`;
+  
+  elements.tMonths.textContent = Math.floor(totalDays / CONFIG.AVG_DAYS_PER_MONTH).toLocaleString();
+  elements.tWeeks.textContent = Math.floor(totalDays / 7).toLocaleString();
+  elements.tDays.textContent = totalDays.toLocaleString();
+  elements.tHours.textContent = totalHours.toLocaleString();
+  elements.tMinutes.textContent = totalMin.toLocaleString();
+  elements.tSeconds.textContent = totalSec.toLocaleString();
+  
+  const heartbeatsLived = Math.floor(totalMin * CONFIG.AVG_HEARTBEAT_BPM);
+  elements.heartbeats.textContent = heartbeatsLived.toLocaleString();
+  
+  let nextBirthday = new Date(birth);
+  nextBirthday.setFullYear(now.getFullYear());
+  if (nextBirthday < now) {
+    nextBirthday.setFullYear(now.getFullYear() + 1);
+  }
+  const daysUntilBirthday = Math.ceil((nextBirthday - now) / 86400000);
+  elements.birthdayDays.textContent = daysUntilBirthday;
+  elements.dayLabel.textContent = daysUntilBirthday !== 1 ? 's' : '';
+  
+  drawAnalog(seconds);
+  
+  if (elements.beat.checked && seconds !== lastSec) {
+    triggerPulse();
+    lastSec = seconds;
+  }
+}
+
+function animationLoop() {
+  updateDisplay();
+  animationFrameId = requestAnimationFrame(animationLoop);
+}
+
+function startAnimation() {
+  if (animationFrameId === null) {
+    animationLoop();
+  }
+}
+
+function stopAnimation() {
+  if (animationFrameId !== null) {
+    cancelAnimationFrame(animationFrameId);
+    animationFrameId = null;
+  }
+}
+
+elements.theme.addEventListener('change', () => {
+  document.body.className = elements.theme.value;
+  drawAnalog(lastSec);
+});
+
+elements.awake.addEventListener('change', async () => {
+  try {
+    if (elements.awake.checked) {
+      if ('wakeLock' in navigator) {
+        wakeLock = await navigator.wakeLock.request('screen');
+      }
+    } else {
+      if (wakeLock) {
+        await wakeLock.release();
+        wakeLock = null;
+      }
+    }
+  } catch (error) {
+    console.warn('Wake Lock API not supported:', error);
+    elements.awake.checked = false;
+    showError('Wake Lock not supported');
+  }
+});
+
+elements.editName.addEventListener('click', () => {
+  const newName = prompt('Enter your name:', personName);
+  
+  if (newName === null) return;
+  
+  if (newName.trim().length === 0) {
+    showError('Name cannot be empty');
+    return;
+  }
+
+  if (newName.length > 50) {
+    showError('Name too long (max 50 characters)');
+    return;
+  }
+  
+  try {
+    personName = newName.trim();
+    localStorage.setItem('personName', personName);
+    updateNameDisplay();
+    showError('');
+  } catch (error) {
+    showError('Failed to save name: ' + error.message);
+  }
+});
+
+elements.editBirth.addEventListener('click', () => {
+  const dateStr = prompt(
+    'Enter birth date (YYYY-MM-DD HH:MM):\n\nCurrent: ' +
+    birth.toISOString().slice(0, 16).replace('T', ' ')
+  );
+  
+  if (!dateStr) return;
+  
+  const parsed = new Date(dateStr);
+  if (!isValidDate(parsed)) {
+    showError('Invalid format: use YYYY-MM-DD HH:MM');
+    return;
+  }
+  
+  if (parsed > new Date()) {
+    showError('Birth date cannot be in the future');
+    return;
+  }
+  
+  try {
+    localStorage.setItem('birth', parsed.toISOString());
+    birth = parsed;
+    lastSec = -1;
+    showError('');
+    updateDisplay();
+  } catch (error) {
+    showError('Failed to save: ' + error.message);
+  }
+});
+
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) {
+    stopAnimation();
+  } else {
+    startAnimation();
+  }
+});
+
+document.addEventListener('visibilitychange', async () => {
+  if (!document.hidden && elements.awake.checked && !wakeLock) {
+    try {
+      wakeLock = await navigator.wakeLock.request('screen');
+    } catch (error) {
+      console.warn('Failed to reacquire wake lock:', error);
+    }
+  }
+});
+
+function showError(message) {
+  if (message) {
+    elements.errorMessage.textContent = message;
+    elements.errorMessage.classList.add('show');
+  } else {
+    elements.errorMessage.classList.remove('show');
+  }
+}
+
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('service-worker.js').catch(error => {
+    console.warn('Service Worker registration failed:', error);
+  });
+}
+
+initializeData();
+startAnimation();
+</script>
+</body>
+</html>

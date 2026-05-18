@@ -223,6 +223,12 @@ button:active {
   display: block;
 }
 
+.pulse-group {
+  border-left: 2px solid var(--border);
+  padding-left: 12px;
+  margin-left: -6px;
+}
+
 @media (max-width: 480px) {
   body {
     padding: 8px;
@@ -246,7 +252,6 @@ button:active {
   }
 }
 
-/* Accessibility improvements */
 button:focus,
 select:focus,
 input:focus {
@@ -316,24 +321,24 @@ input:focus {
       </select>
     </label>
     <label for="beat">
-      <span>Heartbeat Pulse</span>
-      <input type="checkbox" id="beat" checked aria-label="Enable heartbeat pulse animation">
+      <span>Pulse ❤️</span>
+      <input type="checkbox" id="beat" checked aria-label="Enable pulse animation">
     </label>
-    <label for="doubleBeat">
-      <span>Double Beat</span>
-      <input type="checkbox" id="doubleBeat" aria-label="Enable double beat animation">
+    <label for="doubleBeat" class="pulse-group">
+      <span>Double</span>
+      <input type="checkbox" id="doubleBeat" aria-label="Enable double pulse">
     </label>
     <label for="exact">
       <span>Exact Calendar</span>
       <input type="checkbox" id="exact" checked aria-label="Use exact calendar calculation">
     </label>
     <label for="awake">
-      <span>Keep Screen Awake</span>
-      <input type="checkbox" id="awake" aria-label="Keep screen on while app is active">
+      <span>Screen Awake</span>
+      <input type="checkbox" id="awake" aria-label="Keep screen on">
     </label>
   </div>
 
-  <button id="editBirth" aria-label="Edit your birth date">🔐 Edit Birth Date</button>
+  <button id="editBirth">🔐 Edit Birth Date</button>
   <div class="error-message" id="errorMessage" role="alert"></div>
 
   <div class="footer" id="birthday" aria-live="polite"></div>
@@ -342,7 +347,6 @@ input:focus {
 <script>
 'use strict';
 
-/* ===== CONFIGURATION ===== */
 const CONFIG = {
   DEFAULT_BIRTH: '2000-11-13T07:09:00',
   LIFE_EXPECTANCY_YEARS: 80,
@@ -354,14 +358,12 @@ const CONFIG = {
   DOUBLE_BEAT_DELAY: 200
 };
 
-/* ===== STATE ===== */
 let birth = null;
 let animationFrameId = null;
 let lastSec = -1;
-let accentColor = '#ef4444';
 let wakeLock = null;
+let pulseTimeouts = [];
 
-/* ===== DOM ELEMENTS ===== */
 const elements = {
   watch: document.getElementById('watch'),
   mainTime: document.getElementById('mainTime'),
@@ -386,7 +388,6 @@ const elements = {
 
 const canvasContext = elements.analog.getContext('2d');
 
-/* ===== INITIALIZATION ===== */
 function initializeBirthDate() {
   try {
     const stored = localStorage.getItem('birth');
@@ -400,8 +401,6 @@ function initializeBirthDate() {
   } catch (error) {
     console.warn('Error reading birth date from storage:', error);
   }
-  
-  // Fallback to default
   birth = new Date(CONFIG.DEFAULT_BIRTH);
 }
 
@@ -420,17 +419,12 @@ function getThemeColor(varName) {
   }
 }
 
-/* ===== ANALOG CLOCK ===== */
 function drawAnalog(seconds) {
-  const dpr = window.devicePixelRatio || 1;
   const size = 180;
-  
   canvasContext.clearRect(0, 0, size, size);
   canvasContext.save();
-  
   canvasContext.translate(size / 2, size / 2);
   
-  // Draw circle
   canvasContext.beginPath();
   canvasContext.arc(0, 0, 80, 0, Math.PI * 2);
   canvasContext.strokeStyle = getComputedStyle(document.documentElement)
@@ -439,7 +433,6 @@ function drawAnalog(seconds) {
   canvasContext.lineWidth = 1;
   canvasContext.stroke();
   
-  // Draw seconds hand
   canvasContext.rotate((seconds / 60) * Math.PI * 2);
   canvasContext.beginPath();
   canvasContext.moveTo(0, 0);
@@ -451,7 +444,6 @@ function drawAnalog(seconds) {
   canvasContext.restore();
 }
 
-/* ===== TIME CALCULATIONS ===== */
 function exactDiff(birthDate, currentDate) {
   let y = currentDate.getFullYear() - birthDate.getFullYear();
   let m = currentDate.getMonth() - birthDate.getMonth();
@@ -474,6 +466,34 @@ function formatTime(value, digits = 2) {
   return String(value).padStart(digits, '0');
 }
 
+function clearPulseTimeouts() {
+  pulseTimeouts.forEach(timeout => clearTimeout(timeout));
+  pulseTimeouts = [];
+}
+
+function triggerPulse() {
+  clearPulseTimeouts();
+  
+  elements.watch.classList.remove('pulse');
+  void elements.watch.offsetWidth;
+  elements.watch.classList.add('pulse');
+  
+  pulseTimeouts.push(
+    setTimeout(() => elements.watch.classList.remove('pulse'), CONFIG.PULSE_DURATION)
+  );
+  
+  if (elements.doubleBeat.checked) {
+    pulseTimeouts.push(
+      setTimeout(() => {
+        elements.watch.classList.add('pulse');
+        pulseTimeouts.push(
+          setTimeout(() => elements.watch.classList.remove('pulse'), CONFIG.PULSE_DURATION)
+        );
+      }, CONFIG.DOUBLE_BEAT_DELAY)
+    );
+  }
+}
+
 function updateDisplay() {
   const now = new Date();
   const totalMs = now - birth;
@@ -488,7 +508,6 @@ function updateDisplay() {
   const totalHours = Math.floor(totalMin / 60);
   const totalDays = Math.floor(totalHours / 24);
   
-  // Calculate age
   let years, months, days;
   if (elements.exact.checked) {
     ({ y: years, m: months, d: days } = exactDiff(birth, now));
@@ -499,19 +518,16 @@ function updateDisplay() {
     days = Math.floor(remainder - months * CONFIG.AVG_DAYS_PER_MONTH);
   }
   
-  // Calculate remaining time units
   const hours = Math.floor((totalSec % 86400) / 3600);
   const minutes = Math.floor((totalSec % 3600) / 60);
   const seconds = totalSec % 60;
   const milliseconds = totalMs % 1000;
   
-  // Update main display
   elements.mainTime.textContent =
     `${formatTime(years)}:${formatTime(months)}:${formatTime(days)}:` +
     `${formatTime(hours)}:${formatTime(minutes)}:${formatTime(seconds)}.` +
     `${formatTime(milliseconds, 3)}`;
   
-  // Update statistics
   elements.tMonths.textContent = Math.floor(totalDays / CONFIG.AVG_DAYS_PER_MONTH).toLocaleString();
   elements.tWeeks.textContent = Math.floor(totalDays / 7).toLocaleString();
   elements.tDays.textContent = totalDays.toLocaleString();
@@ -519,14 +535,12 @@ function updateDisplay() {
   elements.tMinutes.textContent = totalMin.toLocaleString();
   elements.tSeconds.textContent = totalSec.toLocaleString();
   
-  // Calculate percentages and other metrics
   const lifeUsedPercent = (totalDays / (CONFIG.LIFE_EXPECTANCY_YEARS * CONFIG.AVG_DAYS_PER_YEAR)) * 100;
   elements.lifePct.textContent = lifeUsedPercent.toFixed(4) + '%';
   
   const heartbeatsLived = Math.floor(totalMin * CONFIG.AVG_HEARTBEAT_BPM);
   elements.heartbeats.textContent = heartbeatsLived.toLocaleString();
   
-  // Calculate next birthday
   let nextBirthday = new Date(birth);
   nextBirthday.setFullYear(now.getFullYear());
   if (nextBirthday < now) {
@@ -535,21 +549,10 @@ function updateDisplay() {
   const daysUntilBirthday = Math.ceil((nextBirthday - now) / 86400000);
   elements.birthday.textContent = `🎂 Next birthday in ${daysUntilBirthday} day${daysUntilBirthday !== 1 ? 's' : ''}`;
   
-  // Draw analog clock
   drawAnalog(seconds);
   
-  // Handle pulse animation
   if (elements.beat.checked && seconds !== lastSec) {
-    elements.watch.classList.add('pulse');
-    setTimeout(() => elements.watch.classList.remove('pulse'), CONFIG.PULSE_DURATION);
-    
-    if (elements.doubleBeat.checked) {
-      setTimeout(() => elements.watch.classList.add('pulse'), CONFIG.DOUBLE_BEAT_DELAY);
-      setTimeout(
-        () => elements.watch.classList.remove('pulse'),
-        CONFIG.DOUBLE_BEAT_DELAY + CONFIG.PULSE_DURATION
-      );
-    }
+    triggerPulse();
     lastSec = seconds;
   }
 }
@@ -572,7 +575,6 @@ function stopAnimation() {
   }
 }
 
-/* ===== EVENT HANDLERS ===== */
 elements.theme.addEventListener('change', () => {
   document.body.className = elements.theme.value;
   drawAnalog(lastSec);
@@ -591,15 +593,15 @@ elements.awake.addEventListener('change', async () => {
       }
     }
   } catch (error) {
-    console.warn('Wake Lock API not supported or user denied:', error);
+    console.warn('Wake Lock API not supported:', error);
     elements.awake.checked = false;
-    showError('Wake Lock not supported on this device');
+    showError('Wake Lock not supported');
   }
 });
 
-elements.editBirth.addEventListener('click', async () => {
+elements.editBirth.addEventListener('click', () => {
   const dateStr = prompt(
-    'Enter your birth date (YYYY-MM-DD HH:MM):\n\nCurrent: ' +
+    'Enter birth date (YYYY-MM-DD HH:MM):\n\nCurrent: ' +
     birth.toISOString().slice(0, 16).replace('T', ' ')
   );
   
@@ -607,7 +609,7 @@ elements.editBirth.addEventListener('click', async () => {
   
   const parsed = new Date(dateStr);
   if (!isValidDate(parsed)) {
-    showError('Invalid date format. Please use YYYY-MM-DD HH:MM');
+    showError('Invalid format: use YYYY-MM-DD HH:MM');
     return;
   }
   
@@ -623,11 +625,10 @@ elements.editBirth.addEventListener('click', async () => {
     showError('');
     updateDisplay();
   } catch (error) {
-    showError('Failed to save birth date: ' + error.message);
+    showError('Failed to save: ' + error.message);
   }
 });
 
-// Handle visibility changes to reduce battery usage
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) {
     stopAnimation();
@@ -636,7 +637,6 @@ document.addEventListener('visibilitychange', () => {
   }
 });
 
-// Reload wake lock if needed
 document.addEventListener('visibilitychange', async () => {
   if (!document.hidden && elements.awake.checked && !wakeLock) {
     try {
@@ -656,14 +656,12 @@ function showError(message) {
   }
 }
 
-/* ===== PWA REGISTRATION ===== */
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('service-worker.js').catch(error => {
     console.warn('Service Worker registration failed:', error);
   });
 }
 
-/* ===== STARTUP ===== */
 initializeBirthDate();
 startAnimation();
 </script>

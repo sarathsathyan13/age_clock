@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Life Stopwatch Pro</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<!-- PWA -->
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#020617">
+<meta name="apple-mobile-web-app-capable" content="yes">
+
+<style>
+:root{
+  --bg:#020617; --fg:#e5e7eb; --accent:#ef4444;
+}
+body{
+  margin:0;height:100vh;display:flex;justify-content:center;align-items:center;
+  background:radial-gradient(circle,#111827,var(--bg));
+  font-family:Courier New,monospace;color:var(--fg);
+}
+.theme-neon{--fg:#22d3ee;--accent:#22d3ee;}
+.theme-classic{--bg:#f8fafc;--fg:#020617;--accent:#2563eb;}
+
+.stopwatch{
+  width:380px;padding:24px;border-radius:26px;
+  background:var(--bg);border:1px solid #1f2937;
+  box-shadow:inset 0 0 20px #000,0 0 30px #000;
+}
+.stopwatch.pulse{transform:scale(1.015);box-shadow:0 0 40px var(--accent);}
+.title{text-align:center;font-size:14px;letter-spacing:2px;color:#9ca3af;}
+canvas{display:block;margin:10px auto;}
+.main-time{text-align:center;font-size:22px;margin-top:10px;}
+.labels{text-align:center;font-size:10px;color:#6b7280;}
+.divider{height:1px;background:#1f2937;margin:14px 0;}
+.row{display:flex;justify-content:space-between;font-size:13px;padding:3px 0;}
+.controls label{display:flex;justify-content:space-between;font-size:13px;margin:4px 0;}
+.footer{text-align:center;font-size:11px;color:#9ca3af;margin-top:8px}
+button{width:100%;margin-top:6px}
+</style>
+</head>
+
+<body>
+<div class="stopwatch" id="watch">
+  <div class="title">LIFE STOPWATCH PRO</div>
+
+  <canvas id="analog" width="180" height="180"></canvas>
+
+  <div class="main-time" id="mainTime">00:00:00:00:00:00.000</div>
+  <div class="labels">Y : M : D : H : M : S . ms</div>
+
+  <div style="text-align:center;font-size:12px;margin-top:6px">
+    Life Used: <span id="lifePct">0%</span>
+  </div>
+
+  <div class="divider"></div>
+
+  <div class="details">
+    <div class="row"><span>Total Months</span><span id="tMonths"></span></div>
+    <div class="row"><span>Total Weeks</span><span id="tWeeks"></span></div>
+    <div class="row"><span>Total Days</span><span id="tDays"></span></div>
+    <div class="row"><span>Total Hours</span><span id="tHours"></span></div>
+    <div class="row"><span>Total Minutes</span><span id="tMinutes"></span></div>
+    <div class="row"><span>Total Seconds</span><span id="tSeconds"></span></div>
+    <div class="row"><span>Heartbeats Lived ❤️</span><span id="heartbeats"></span></div>
+  </div>
+
+  <div class="divider"></div>
+
+  <div class="controls">
+    <label><span>Theme</span>
+      <select id="theme">
+        <option value="">Dark</option>
+        <option value="theme-neon">Neon</option>
+        <option value="theme-classic">Classic</option>
+      </select>
+    </label>
+    <label><span>Heartbeat</span><input type="checkbox" id="beat" checked></label>
+    <label><span>Double Beat</span><input type="checkbox" id="doubleBeat"></label>
+    <label><span>Exact Calendar</span><input type="checkbox" id="exact" checked></label>
+    <label><span>Keep Screen Awake</span><input type="checkbox" id="awake"></label>
+  </div>
+
+  <button id="editBirth">🔐 Edit Birth Date</button>
+
+  <div class="footer" id="birthday"></div>
+</div>
+
+<script>
+/* BIRTH */
+let birth=new Date(localStorage.birth||"2000-11-13T07:09:00+05:30");
+
+/* THEME */
+theme.onchange=()=>document.body.className=theme.value;
+
+/* WAKE LOCK */
+let wakeLock=null;
+awake.onchange=async()=>awake.checked?
+  wakeLock=await navigator.wakeLock?.request("screen"):
+  wakeLock?.release();
+
+/* ANALOG */
+const ctx=analog.getContext("2d");
+function drawAnalog(s){
+  ctx.clearRect(0,0,180,180);
+  ctx.translate(90,90);
+  ctx.beginPath();ctx.arc(0,0,80,0,Math.PI*2);ctx.strokeStyle="#6b7280";ctx.stroke();
+  ctx.rotate(s/60*Math.PI*2);
+  ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(0,-60);
+  ctx.strokeStyle="var(--accent)";ctx.stroke();
+  ctx.setTransform(1,0,0,1,0,0);
+}
+
+/* UPDATE */
+let lastSec=-1;
+function exactDiff(a,b){
+  let y=b.getFullYear()-a.getFullYear(),
+      m=b.getMonth()-a.getMonth(),
+      d=b.getDate()-a.getDate();
+  if(d<0){m--;d+=new Date(b.getFullYear(),b.getMonth(),0).getDate();}
+  if(m<0){y--;m+=12;}
+  return{y,m,d};
+}
+
+function update(){
+  const now=new Date(),ms=now-birth;
+  const sTot=Math.floor(ms/1000),mTot=Math.floor(sTot/60),
+        hTot=Math.floor(mTot/60),dTot=Math.floor(hTot/24);
+
+  let y,m,d;
+  if(exact.checked)({y,m,d}=exactDiff(birth,now));
+  else{y=Math.floor(dTot/365.2422);let r=dTot-y*365.2422;m=Math.floor(r/30.44);d=Math.floor(r-m*30.44);}
+
+  const h=Math.floor((sTot%86400)/3600),
+        mi=Math.floor((sTot%3600)/60),
+        s=sTot%60,ms2=ms%1000;
+
+  mainTime.textContent=
+    `${y.toString().padStart(2,"0")}:${m.toString().padStart(2,"0")}:${d.toString().padStart(2,"0")}:`+
+    `${h.toString().padStart(2,"0")}:${mi.toString().padStart(2,"0")}:${s.toString().padStart(2,"0")}.`+
+    `${ms2.toString().padStart(3,"0")}`;
+
+  tMonths.textContent=Math.floor(dTot/30.44).toLocaleString();
+  tWeeks.textContent=Math.floor(dTot/7).toLocaleString();
+  tDays.textContent=dTot.toLocaleString();
+  tHours.textContent=hTot.toLocaleString();
+  tMinutes.textContent=mTot.toLocaleString();
+  tSeconds.textContent=sTot.toLocaleString();
+
+  lifePct.textContent=((dTot/(80*365.2422))*100).toFixed(4)+"%";
+  heartbeats.textContent=Math.floor(mTot*72).toLocaleString();
+
+  let nb=new Date(birth);nb.setFullYear(now.getFullYear());
+  if(nb<now)nb.setFullYear(now.getFullYear()+1);
+  birthday.textContent=`🎂 Next birthday in ${Math.ceil((nb-now)/86400000)} days`;
+
+  drawAnalog(s);
+
+  if(beat.checked&&s!==lastSec){
+    watch.classList.add("pulse");
+    setTimeout(()=>watch.classList.remove("pulse"),120);
+    if(doubleBeat.checked){
+      setTimeout(()=>watch.classList.add("pulse"),200);
+      setTimeout(()=>watch.classList.remove("pulse"),320);
+    }
+    lastSec=s;
+  }
+  requestAnimationFrame(update);
+}
+update();
+
+/* EDIT BIRTH */
+editBirth.onclick=()=>{
+  if(prompt("Enter PIN")!=="1311")return alert("Wrong PIN");
+  const v=prompt("YYYY-MM-DD HH:MM");
+  if(v){localStorage.birth=v;location.reload();}
+};
+
+/* PWA */
+if("serviceWorker"in navigator)
+  navigator.serviceWorker.register("service-worker.js");
+</script>
+</body>
+</html>

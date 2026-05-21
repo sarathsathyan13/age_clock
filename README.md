@@ -1,2 +1,2 @@
 # Age_Clock
-Stopwatch from Birth
+Stopwatch since Birth
